@@ -83,19 +83,39 @@ def get_ip():
         ip = re.search("IPv4,(.*?),", ip).group(1)
     return ip
 
-def get_nordvpn_servers():
-    serverlist =  BeautifulSoup(requests.get("https://nordvpn.com/api/server").content,"html.parser")
-    site_json=json.loads(serverlist.text)
 
-    filtered_servers = {key: [] for key in ['windows_names','linux_names']}
-    for specific_dict in site_json:
+def get_nordvpn_servers():
+    # Fetch the server data from the updated NordVPN API
+    response = requests.get("https://api.nordvpn.com/v1/servers?limit=0")
+    site_json = response.json()
+
+    # Initialize filtered servers dictionary
+    filtered_servers = {'windows_names': [], 'linux_names': []}
+
+    for server in site_json:
         try:
-            if specific_dict['categories'][0]['name'] == 'Standard VPN servers':
-                filtered_servers['windows_names'].append(specific_dict['name'])
-                filtered_servers['linux_names'].append(specific_dict['domain'].split('.')[0])
-        except IndexError:
-            pass
+            # Check if the server belongs to "Standard VPN servers"
+            if any(group['title'] == 'Standard VPN servers' for group in server.get('groups', [])):
+                filtered_servers['windows_names'].append(server['name'])
+                filtered_servers['linux_names'].append(server['hostname'].split('.')[0])
+        except KeyError:
+            pass  # Skip servers with missing data
+
     return filtered_servers
+## Old Code
+#def get_nordvpn_servers():
+#    serverlist =  BeautifulSoup(requests.get("https://nordvpn.com/api/server").content,"html.parser")
+#    site_json=json.loads(serverlist.text)
+#
+#    filtered_servers = {key: [] for key in ['windows_names','linux_names']}
+#    for specific_dict in site_json:
+#        try:
+#            if specific_dict['categories'][0]['name'] == 'Standard VPN servers':
+#                filtered_servers['windows_names'].append(specific_dict['name'])
+#                filtered_servers['linux_names'].append(specific_dict['domain'].split('.')[0])
+#        except IndexError:
+#            pass
+#    return filtered_servers
 
 ###############
 #intialize vpn#
@@ -190,11 +210,11 @@ def initialize_VPN(stored_settings=0,save=0,area_input=None,skip_settings=0):
                         password = credentials.split("/")[1]
                     except IndexError:
                         error_login = input("\n\033[34mYou have provided your credentials in the wrong format. Press enter and please try again.\n"
-                              "Your input should look something like this: name@gmail.com/password\033[0m")
+                              "Your input should look something like this: token")
                     else:
                         login_needed = 0
             try:
-                login_nordvpn = check_output(["nordvpn","login","-username",login,"-password",password])
+                login_nordvpn = check_output(["nordvpn","login","--token", token])
             except subprocess.CalledProcessError:
                 raise Exception("\nSorry,something went wrong while trying to log in\n")
             if "Welcome" in str(login_nordvpn):
